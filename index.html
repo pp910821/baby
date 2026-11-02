@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>成長紀錄</title>
 <style>
-:root{color-scheme:light;--bg:#fdf3c4;--card:#fffbe8;--ink:#4a3a14;--sub:#8c7a4a;--line:#ecdf9f;--h:#2f7f6c;--w:#cc6528;--acc:#5a4515;--accink:#fff8d6;
+:root{color-scheme:light;--bg:#fdf3c4;--card:#fffbe8;--ink:#4a3a14;--sub:#8c7a4a;--line:#ecdf9f;--h:#2f7f6c;--w:#cc6528;--f:#7a5aa6;--acc:#5a4515;--accink:#fff8d6;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -21,6 +21,8 @@ h1{font-size:26px;margin:6px 0 14px;font-weight:800;letter-spacing:.04em}
 .now small{color:var(--sub);font-size:14px}
 .now div:nth-child(1) b{color:var(--h)}
 .now div:nth-child(2) b{color:var(--w)}
+.now div:nth-child(3) b{color:var(--f)}
+.now.a b{font-size:24px}
 .up{font-size:13px;color:var(--sub)}
 .tabs{display:flex;gap:6px;margin-bottom:8px}
 .tab{flex:1;padding:8px;border-radius:10px;border:1.5px solid var(--line);background:none;color:var(--sub);font:inherit;font-weight:600}
@@ -46,6 +48,8 @@ h2{font-size:16px;margin:0 0 10px}
 #panel{margin-top:14px;margin-bottom:0}
 #panel p{margin:0 0 10px;font-weight:600}
 #panel input{margin:0 0 10px}
+#pType,#pGen{margin-bottom:10px}
+.tp[aria-pressed=true],.tg[aria-pressed=true]{background:var(--acc);color:var(--accink);border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -57,6 +61,7 @@ h2{font-size:16px;margin:0 0 10px}
   <div class="tabs">
     <button class="tab" id="tH" aria-pressed="true">身高 cm</button>
     <button class="tab" id="tW" aria-pressed="false">體重 kg</button>
+    <button class="tab" id="tF" aria-pressed="false" hidden>體脂肪 %</button>
   </div>
   <div id="chart"></div>
   <p class="tip" id="tip">點選圖上的點可查看數值</p>
@@ -67,6 +72,7 @@ h2{font-size:16px;margin:0 0 10px}
     <div class="full"><label>日期<input type="date" id="d" required></label></div>
     <label>身高 (cm)<input type="number" id="h" step="0.1" min="20" max="250" inputmode="decimal" required></label>
     <label>體重 (kg)<input type="number" id="w" step="0.01" min="1" max="200" inputmode="decimal" required></label>
+    <label class="full" id="bfWrap" hidden>體脂肪 (%)，選填<input type="number" id="bf" step="0.1" min="2" max="70" inputmode="decimal"></label>
     <div class="full"><button class="btn" type="submit">儲存紀錄</button></div>
   </form>
 </div>
@@ -75,12 +81,20 @@ h2{font-size:16px;margin:0 0 10px}
   <div id="list"></div>
 </div>
 <div class="row">
-  <button class="btn ghost" id="addKid">新增小孩</button>
-  <button class="btn ghost" id="rmKid">刪除此小孩</button>
+  <button class="btn ghost" id="addKid">新增成員</button>
+  <button class="btn ghost" id="rmKid">刪除此成員</button>
 </div>
 <div class="card" id="panel" hidden>
   <p id="pMsg"></p>
-  <input type="text" id="pIn" maxlength="12" placeholder="例如：小明">
+  <div class="row" id="pType">
+    <button class="btn ghost tp" type="button" data-t="child" aria-pressed="true">小孩</button>
+    <button class="btn ghost tp" type="button" data-t="adult" aria-pressed="false">成人</button>
+  </div>
+  <div class="row" id="pGen">
+    <button class="btn ghost tg" type="button" data-g="m" aria-pressed="true">♂ 男生</button>
+    <button class="btn ghost tg" type="button" data-g="f" aria-pressed="false">♀ 女生</button>
+  </div>
+  <input type="text" id="pIn" maxlength="12" placeholder="名字或暱稱">
   <div class="row">
     <button class="btn ghost" id="pNo" type="button">取消</button>
     <button class="btn" id="pYes" type="button">確定</button>
@@ -99,17 +113,23 @@ function kid(){return S.kids[S.cur]}
 function sorted(){return kid().recs.slice().sort(function(a,b){return a.d<b.d?-1:1})}
 function fmt(d){var p=d.split("-");return +p[1]+"/"+ +p[2]}
 function esc(s){return s.replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function ico(k){var f=k.g=="f";return k.type=="adult"?(f?"👩":"👨"):(f?"👧":"👦")}
 function renderKids(){
-  $("kids").innerHTML=S.kids.map(function(k,i){return '<button class="kid" data-i="'+i+'" aria-pressed="'+(i==S.cur)+'">'+esc(k.name)+'</button>'}).join("");
+  $("kids").innerHTML=S.kids.map(function(k,i){return '<button class="kid" data-i="'+i+'" aria-pressed="'+(i==S.cur)+'">'+ico(k)+" "+esc(k.name)+'</button>'}).join("");
+}
+function bmiRow(l){
+  var b=l.w/Math.pow(l.h/100,2),c=b<18.5?"過輕":b<24?"正常":b<27?"過重":"肥胖";
+  return '<div style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px"><small>BMI</small><b style="font-size:24px;color:var(--ink)">'+b.toFixed(1)+'<span style="font-size:14px;font-weight:600"> '+c+'</span></b></div>';
 }
 function renderNow(){
-  var r=sorted(),l=r[r.length-1],p=r[r.length-2];
+  var r=sorted(),l=r[r.length-1],p=r[r.length-2],hf=!!(l&&l.f!=null);
+  $("now").className="card now"+(hf?" a":"");$("now").style.gridTemplateColumns=hf?"1fr 1fr 1fr":"1fr 1fr";
   if(!l){$("now").innerHTML='<p class="empty" style="grid-column:1/-1">還沒有紀錄，從下方新增第一筆。</p>';return}
-  function dl(a,b,u){if(!p)return"";var x=+(a-b).toFixed(2);return '<span class="up">較上次 '+(x>=0?"+":"")+x+" "+u+"</span>"}
-  $("now").innerHTML='<div><small>身高</small><b>'+l.h+'<span style="font-size:15px"> cm</span></b>'+dl(l.h,p&&p.h,"cm")+'</div><div><small>體重</small><b>'+l.w+'<span style="font-size:15px"> kg</span></b>'+dl(l.w,p&&p.w,"kg")+'</div><div class="up" style="grid-column:1/-1">最近紀錄：'+l.d+'</div>';
+  function dl(a,b,u){if(!p||a==null||b==null)return"";var x=+(a-b).toFixed(2);return '<span class="up">較上次 '+(x>=0?"+":"")+x+" "+u+"</span>"}
+  $("now").innerHTML='<div><small>身高</small><b>'+l.h+'<span style="font-size:15px"> cm</span></b>'+dl(l.h,p&&p.h,"cm")+'</div><div><small>體重</small><b>'+l.w+'<span style="font-size:15px"> kg</span></b>'+dl(l.w,p&&p.w,"kg")+'</div>'+(hf?'<div><small>體脂肪</small><b>'+l.f+'<span style="font-size:15px"> %</span></b>'+dl(l.f,p&&p.f,"%")+'</div>':'')+(kid().type=="adult"?bmiRow(l):"")+'<div class="up" style="grid-column:1/-1">最近紀錄：'+l.d+'</div>';
 }
 function renderChart(){
-  var r=sorted(),W=360,H=230,L=38,R=14,T=14,B=28,c=metric=="h"?"var(--h)":"var(--w)";
+  var r=sorted().filter(function(x){return x[metric]!=null}),W=360,H=230,L=38,R=14,T=14,B=28,c=metric=="h"?"var(--h)":metric=="w"?"var(--w)":"var(--f)";
   if(r.length<2){$("chart").innerHTML='<p class="empty">至少需要 2 筆紀錄才能畫出曲線。</p>';return}
   var v=r.map(function(x){return x[metric]}),mn=Math.min.apply(0,v),mx=Math.max.apply(0,v),pad=(mx-mn||1)*.2;
   mn=Math.floor(mn-pad);mx=Math.ceil(mx+pad);
@@ -130,23 +150,23 @@ function renderChart(){
   $("chart").innerHTML=s+"</svg>";
 }
 function renderList(){
-  var r=sorted().reverse();
+  var r=sorted().reverse(),ad=kid().type=="adult";
   if(!r.length){$("list").innerHTML='<p class="empty">尚無紀錄</p>';return}
-  $("list").innerHTML='<table><tr><th>日期</th><th>身高</th><th>體重</th><th></th></tr>'+r.map(function(x){return '<tr><td>'+x.d+'</td><td>'+x.h+' cm</td><td>'+x.w+' kg</td><td><button class="del" data-id="'+x.id+'" aria-label="刪除 '+x.d+' 的紀錄">×</button></td></tr>'}).join("")+'</table>';
+  $("list").innerHTML='<table><tr><th>日期</th><th>身高</th><th>體重</th>'+(ad?'<th>體脂</th>':'')+'<th></th></tr>'+r.map(function(x){return '<tr><td>'+x.d+'</td><td>'+x.h+' cm</td><td>'+x.w+' kg</td>'+(ad?'<td>'+(x.f!=null?x.f+' %':'–')+'</td>':'')+'<td><button class="del" data-id="'+x.id+'" aria-label="刪除 '+x.d+' 的紀錄">×</button></td></tr>'}).join("")+'</table>';
 }
-function all(){renderKids();renderNow();renderChart();renderList();$("tip").textContent="點選圖上的點可查看數值"}
+function all(){var ad=kid().type=="adult";$("tF").hidden=!ad;$("bfWrap").hidden=!ad;$("bf").required=false;if(!ad&&metric=="f")setM("h");renderKids();renderNow();renderChart();renderList();$("tip").textContent="點選圖上的點可查看數值"}
 $("kids").onclick=function(e){var b=e.target.closest(".kid");if(b){S.cur=+b.dataset.i;save();all()}};
-function setM(m){metric=m;$("tH").setAttribute("aria-pressed",m=="h");$("tW").setAttribute("aria-pressed",m=="w");renderChart()}
-$("tH").onclick=function(){setM("h")};$("tW").onclick=function(){setM("w")};
+function setM(m){metric=m;$("tH").setAttribute("aria-pressed",m=="h");$("tW").setAttribute("aria-pressed",m=="w");$("tF").setAttribute("aria-pressed",m=="f");renderChart()}
+$("tH").onclick=function(){setM("h")};$("tW").onclick=function(){setM("w")};$("tF").onclick=function(){setM("f")};
 $("chart").onclick=function(e){
   var h=e.target.closest(".hit");if(!h)return;
-  var x=sorted()[+h.dataset.i];
-  $("tip").textContent=x.d+"　身高 "+x.h+" cm　體重 "+x.w+" kg";
+  var x=sorted().filter(function(y){return y[metric]!=null})[+h.dataset.i];
+  $("tip").textContent=x.d+"　身高 "+x.h+" cm　體重 "+x.w+" kg"+(x.f!=null?"　體脂肪 "+x.f+" %":"")+(kid().type=="adult"?"　BMI "+(x.w/Math.pow(x.h/100,2)).toFixed(1):"");
 };
 $("f").onsubmit=function(e){
   e.preventDefault();
-  kid().recs.push({id:Date.now()+"",d:$("d").value,h:+$("h").value,w:+$("w").value});
-  save();$("h").value="";$("w").value="";all();
+  kid().recs.push({id:Date.now()+"",d:$("d").value,h:+$("h").value,w:+$("w").value,f:(kid().type=="adult"&&$("bf").value!=="")?+$("bf").value:undefined});
+  save();$("h").value="";$("w").value="";$("bf").value="";all();
 };
 $("list").onclick=function(e){
   var b=e.target.closest(".del");if(!b)return;
@@ -154,9 +174,14 @@ $("list").onclick=function(e){
     kid().recs=kid().recs.filter(function(x){return x.id!==b.dataset.id});save();all();
   });
 };
-var onYes=null;
+var onYes=null,newType="child";
+function setT(t){newType=t;[].forEach.call(document.querySelectorAll(".tp"),function(x){x.setAttribute("aria-pressed",x.dataset.t==t)})}
+$("pType").onclick=function(e){var b=e.target.closest(".tp");if(b)setT(b.dataset.t)};
+var newG="m";
+function setG(g){newG=g;[].forEach.call(document.querySelectorAll(".tg"),function(x){x.setAttribute("aria-pressed",x.dataset.g==g)})}
+$("pGen").onclick=function(e){var b=e.target.closest(".tg");if(b)setG(b.dataset.g)};
 function ask(msg,input,cb){
-  $("pMsg").textContent=msg;$("pIn").hidden=!input;$("pIn").value="";
+  $("pMsg").textContent=msg;$("pIn").hidden=!input;$("pType").hidden=!input;$("pGen").hidden=!input;if(input){setT("child");setG("m")}$("pIn").value="";
   onYes=cb;$("panel").hidden=false;
   $("panel").scrollIntoView({block:"center"});
   if(input)$("pIn").focus();
@@ -166,13 +191,13 @@ $("pNo").onclick=closeP;
 $("pYes").onclick=function(){var cb=onYes;if(cb)cb($("pIn").value);closeP()};
 $("pIn").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();$("pYes").click()}};
 $("addKid").onclick=function(){
-  ask("小孩的名字或暱稱",true,function(n){
+  ask("新增成員：選擇類型、性別，並輸入名字",true,function(n){
     n=(n||"").trim();
-    if(n){S.kids.push({name:n,recs:[]});S.cur=S.kids.length-1;save();all()}
+    if(n){S.kids.push({name:n,type:newType,g:newG,recs:[]});S.cur=S.kids.length-1;save();all()}
   });
 };
 $("rmKid").onclick=function(){
-  if(S.kids.length<2){ask("至少要保留一位小孩，無法刪除。",false,null);return}
+  if(S.kids.length<2){ask("至少要保留一位成員，無法刪除。",false,null);return}
   ask("刪除「"+kid().name+"」與所有紀錄？",false,function(){
     S.kids.splice(S.cur,1);S.cur=0;save();all();
   });
